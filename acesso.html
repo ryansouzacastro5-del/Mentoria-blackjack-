@@ -1,0 +1,13 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mentoria BLACKJACK</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#050907;color:#fff;font-family:Arial}.top{background:#07150f;border-bottom:1px solid #19c37d55;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}.top b{color:#19c37d;letter-spacing:3px;font:20px Georgia}.top a{color:#b8c8be;font-size:13px;text-decoration:none;border:1px solid #19c37d55;padding:8px 12px;border-radius:6px}iframe{width:100%;height:calc(100vh - 60px);border:none;background:white;display:block}.erro{padding:30px;text-align:center;color:#ff7777}.erro a{color:#19c37d}</style>
+</head><body><div class="top"><b>BLACKJACK</b><span id="user" style="font-size:13px;color:#b8c8be"></span><a href="index.html">Sair</a></div><div id="wrap"></div>
+<script>
+const token=new URLSearchParams(location.search).get('token')||localStorage.getItem('bj_token');
+if(!token){ document.getElementById('wrap').innerHTML='<div class="erro">Acesso negado. <a href="retorno.html">Volte, preencha seus dados e confirme seu pagamento</a></div>'; }
+else{
+  localStorage.setItem('bj_token', token);
+  const nome=localStorage.getItem('bj_nome')||'';
+  if(nome) document.getElementById('user').textContent='Olá, '+nome;
+  document.getElementById('wrap').innerHTML='<iframe src="/pdf?token='+encodeURIComponent(token)+'#toolbar=1&navpanes=0&view=FitH" allow="fullscreen"></iframe>';
+}
+</script></body></html>
