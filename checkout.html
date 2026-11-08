@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Checkout BLACKJACK</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050907;color:#f0fff6;font:16px Arial;min-height:100vh;display:grid;place-items:center;padding:20px}.box{width:min(520px,100%);background:#10251b;border:1px solid #19c37d66;border-radius:16px;padding:28px}.brand{color:#19c37d;letter-spacing:3px;font:bold 24px Georgia}.muted{color:#b8c8be}.price{font:48px Georgia;color:#19c37d;margin:12px 0}label{display:block;margin:18px 0 7px;font-weight:bold}input{width:100%;padding:15px;border-radius:8px;border:1px solid #466b58;background:#07110b;color:white;font-size:16px}.btn{width:100%;padding:16px;border:0;border-radius:8px;background:#19c37d;color:#04150c;font-weight:bold;font-size:15px;margin-top:22px;cursor:pointer}.btn:disabled{opacity:.5}.status{white-space:pre-wrap;margin-top:16px;color:#d9f5e5}a{color:#19c37d}
+</style>
+</head>
+<body>
+<main class="box">
+<div class="brand">BLACKJACK</div>
+<p class="muted">Checkout seguro • PagBank</p>
+<h1>Mentoria de Estratégia</h1>
+<div class="price">R$ 4,99</div>
+<p class="muted">Pix e Cartão de Crédito</p>
+<form id="f"><label>Nome completo</label><input id="nome" required minlength="5" placeholder="Seu nome completo"><label>E-mail</label><input id="email" type="email" required placeholder="Seu melhor e-mail"><button class="btn" id="go" type="submit">CONTINUAR PARA PAGAMENTO</button></form>
+<div class="status" id="s"></div>
+<p class="muted" style="font-size:13px"><a href="index.html">Voltar</a> • <a href="retorno.html">Já paguei, quero acessar</a></p>
+</main>
+<script>
+const nomeEl=document.getElementById('nome'), emailEl=document.getElementById('email');
+nomeEl.value=localStorage.getItem('bj_nome')||''; emailEl.value=localStorage.getItem('bj_email')||'';
+document.getElementById('f').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const b=document.getElementById('go'), s=document.getElementById('s');
+  const nome=nomeEl.value.trim(), email=emailEl.value.trim().toLowerCase();
+  if(nome.split(/\s+/).length<2){ s.textContent='Informe nome e sobrenome'; return; }
+  b.disabled=true; s.textContent='Salvando seus dados e criando checkout no PagBank...';
+  try{
+    const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome,email})});
+    const d=await r.json(); if(!r.ok) throw new Error(d.error||'Erro ao criar checkout');
+    localStorage.setItem('bj_order', d.orderId); localStorage.setItem('bj_nome', nome); localStorage.setItem('bj_email', email);
+    window.location.href=d.pay_url;
+  }catch(err){ s.textContent='Erro: '+err.message; b.disabled=false; }
+});
+</script>
+</body>
+</html>
