@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acessar Mentoria | BLACKJACK</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial;background:#07150f;color:white;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}.container{width:100%;max-width:420px;background:#10251b;padding:35px 25px;border-radius:16px;border:1px solid #245c3d;text-align:center}.logo{font-size:30px;color:#19c37d;letter-spacing:3px}input{width:100%;padding:16px;margin-bottom:15px;border-radius:8px;border:1px solid #35644b;background:#07150f;color:white}button{width:100%;padding:16px;background:#19c37d;border:none;border-radius:8px;font-weight:bold;cursor:pointer}button:disabled{opacity:.5}#mensagem{margin-top:18px;font-size:14px;line-height:1.5}#mensagem.ok{color:#19c37d}#mensagem.erro{color:#ff7777}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="logo">BLACKJACK</div>
+<h2 style="margin:15px 0">Acesse sua mentoria</h2>
+<p style="color:#b8c9be;font-size:14px;margin-bottom:20px" id="info">Informe o <b>mesmo nome e e-mail</b> que você usou no checkout. O banco de dados vai confirmar se você já pagou.</p>
+<form id="formAcesso">
+<input id="nome" placeholder="Nome completo usado na compra" required>
+<input id="email" type="email" placeholder="E-mail usado na compra" required>
+<button id="botao" type="submit">VERIFICAR MEU PAGAMENTO</button>
+</form>
+<div id="mensagem"></div>
+<a href="index.html" style="color:#b8c9be;font-size:13px;display:block;margin-top:15px">← Voltar</a>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const orderId = params.get('order') || localStorage.getItem('bj_order') || '';
+const nomeEl = document.getElementById('nome');
+const emailEl = document.getElementById('email');
+const msg = document.getElementById('mensagem');
+const info = document.getElementById('info');
+const botao = document.getElementById('botao');
+
+// Já deixa preenchido com o que ele digitou no checkout, pra não ter que digitar tudo de novo
+nomeEl.value = localStorage.getItem('bj_nome') || '';
+emailEl.value = localStorage.getItem('bj_email') || '';
+if(orderId) info.innerHTML = 'Pedido identificado: <b>' + orderId + '</b><br>Confirme seu nome e e-mail abaixo.';
+
+document.getElementById('formAcesso').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const nome = nomeEl.value.trim();
+  const email = emailEl.value.trim().toLowerCase();
+
+  botao.disabled = true;
+  botao.textContent = 'CONSULTANDO BANCO DE DADOS...';
+  msg.className = '';
+  msg.textContent = 'Consultando no Layerbase + PagBank se você já pagou...';
+
+  try{
+    const r = await fetch('/api/verificar-acesso', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ nome, email, orderId })
+    });
+    const d = await r.json();
+
+    // CASO 1: PAGOU -> BANCO CONFIRMA E LIBERA
+    if(d.paid){
+      msg.className = 'ok';
+      msg.textContent = 'Pagamento confirmado! Olá ' + d.nome + ', liberando seu acesso...';
+      localStorage.setItem('bj_token', d.token);
+      localStorage.setItem('bj_nome', d.nome);
+      localStorage.setItem('bj_email', d.email);
+      setTimeout(()=> window.location.href = 'acesso.html?token=' + encodeURIComponent(d.token), 800);
+      return;
+    }
+
+    // CASO 2: NUNCA COMPROU -> CAI NO CHECKOUT AUTOMATICAMENTE
+    if(d.status === 'NOT_FOUND'){
+      msg.className = 'erro';
+      msg.textContent = 'Você ainda não comprou. Te levando para o checkout...';
+      localStorage.setItem('bj_nome', nome);
+      localStorage.setItem('bj_email', email);
+      setTimeout(()=> window.location.href = 'checkout.html', 1200);
+      return;
+    }
+
+    // CASO 3: E-MAIL OU NOME ERRADO
+    if(d.status === 'EMAIL_MISMATCH' || d.status === 'NAME_MISMATCH'){
+      msg.className = 'erro';
+      msg.textContent = d.message + ' Use o mesmo que você usou no checkout.';
+      botao.disabled = false; botao.textContent = 'VERIFICAR MEU PAGAMENTO';
+      return;
+    }
+
+    // CASO 4: AINDA NÃO PAGOU
+    msg.className = 'erro';
+    msg.textContent = d.message || ('Pagamento ainda: ' + d.status + '. Se já pagou, aguarde 10 segundos e tente de novo.');
+    botao.disabled = false; botao.textContent = 'ACESSAR A MENTORIA';
+
+  }catch(err){
+    msg.className = 'erro';
+    msg.textContent = 'Erro ao consultar o banco. Tente de novo.';
+    botao.disabled = false; botao.textContent = 'VERIFICAR MEU PAGAMENTO';
+  }
+});
+</script>
+</body>
+</html>
