@@ -9,11 +9,11 @@
 <body>
 <main class="box">
 <div class="brand">BLACKJACK</div>
-<p class="muted">Checkout seguro • PagBank</p>
+<p class="muted">Atendimento direto no WhatsApp</p>
 <h1>Mentoria de Estratégia</h1>
 <div class="price">R$ 4,99</div>
-<p class="muted">Pix e Cartão de Crédito</p>
-<form id="f"><label>Nome completo</label><input id="nome" required minlength="5" placeholder="Seu nome completo"><label>E-mail</label><input id="email" type="email" required placeholder="Seu melhor e-mail"><button class="btn" id="go" type="submit">CONTINUAR PARA PAGAMENTO</button></form>
+<p class="muted">Pix e Cartão de Crédito • Vaga via WhatsApp</p>
+<form id="f"><label>Nome completo</label><input id="nome" required minlength="5" placeholder="Seu nome completo"><label>E-mail</label><input id="email" type="email" required placeholder="Seu melhor e-mail"><button class="btn" id="go" type="submit">COMPRAR PELO WHATSAPP</button></form>
 <div class="status" id="s"></div>
 <p class="muted" style="font-size:13px"><a href="index.html">Voltar</a> • <a href="retorno.html">Já paguei, quero acessar</a></p>
 </main>
@@ -25,13 +25,16 @@ document.getElementById('f').addEventListener('submit', async (e)=>{
   const b=document.getElementById('go'), s=document.getElementById('s');
   const nome=nomeEl.value.trim(), email=emailEl.value.trim().toLowerCase();
   if(nome.split(/\s+/).length<2){ s.textContent='Informe nome e sobrenome'; return; }
-  b.disabled=true; s.textContent='Salvando seus dados e criando checkout no PagBank...';
-  try{
-    const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome,email})});
-    const d=await r.json(); if(!r.ok) throw new Error(d.error||'Erro ao criar checkout');
-    localStorage.setItem('bj_order', d.orderId); localStorage.setItem('bj_nome', nome); localStorage.setItem('bj_email', email);
-    window.location.href=d.pay_url;
-  }catch(err){ s.textContent='Erro: '+err.message; b.disabled=false; }
+  if(!email.includes('@')){ s.textContent='Informe um e-mail válido'; return; }
+
+  localStorage.setItem('bj_nome', nome);
+  localStorage.setItem('bj_email', email);
+
+  s.textContent='Abrindo seu WhatsApp...';
+
+  const msg = `Olá! Quero comprar a Mentoria BLACKJACK por R$ 4,99.%0A%0ANome: ${encodeURIComponent(nome)}%0AE-mail: ${encodeURIComponent(email)}%0A%0APode me passar o Pix / Link de pagamento?`;
+  const wa = `https://wa.me/5569992959785?text=${msg}`;
+  window.location.href = wa;
 });
 </script>
 </body>
