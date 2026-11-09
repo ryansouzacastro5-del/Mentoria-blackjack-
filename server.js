@@ -3,6 +3,9 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const https = require('node:https');
+const dns = require('node:dns');
+
 const app = express();
 app.use(express.json());
 const PORT = process.env.PORT || 3000;
@@ -13,6 +16,58 @@ const ACCESS_SECRET = process.env.ACCESS_SECRET || 'troque-por-uma-chave-de-64-c
 const LAYERBASE_URL = (process.env.LAYERBASE_URL || '').replace(/\/$/, '');
 const LAYERBASE_API_KEY = process.env.LAYERBASE_API_KEY || '';
 const BASE = PAGBANK_ENV === 'production' ? 'https://api.pagbank.com.br' : 'https://sandbox.api.pagbank.com.br';
+
+// ===== CORREÇÃO DNS DO RENDER =====
+// O DNS do Render não resolve api.pagbank.com.br, então a gente
+// resolve o IP usando DNS do Google/Cloudflare e conecta direto no IP
+const resolver = new dns.Resolver();
+resolver.setServers(['1.1.1.1', '8.8.8.8']);
+
+function resolvePagbankIp() {
+  return new Promise((resolve, reject) => {
+    const hostname = new URL(BASE).hostname;
+    resolver.resolve4(hostname, (err, addrs) => {
+      if (err) return reject(err);
+      if (!addrs || !addrs.length) return reject(new Error('DNS sem resposta'));
+      resolve(addrs[0]);
+    });
+  });
+}
+
+function pagbankRequest(pathUrl, method = 'GET', bodyObj = null) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const hostname = new URL(BASE).hostname;
+      const ip = await resolvePagbankIp();
+      const body = bodyObj ? JSON.stringify(bodyObj) : null;
+      const req = https.request({
+        host: ip,
+        port: 443,
+        path: pathUrl,
+        method: method,
+        servername: hostname,
+        headers: {
+          'Authorization': 'Bearer ' + PAGBANK_TOKEN,
+          'Content-Type': 'application/json',
+          'Host': hostname,
+          'Content-Length': body ? Buffer.byteLength(body) : 0
+        }
+      }, (res) => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { parsed = data; }
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, data: parsed });
+        });
+      });
+      req.on('error', reject);
+      if (body) req.write(body);
+      req.end();
+    } catch (e) { reject(e); }
+  });
+}
+// ===== FIM CORREÇÃO =====
 
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -76,8 +131,8 @@ app.post('/api/checkout', async (req, res) => {
     if(!PAGBANK_TOKEN) return res.status(500).json({ error: 'PAGBANK_TOKEN não configurado no Render' });
     const orderId = 'BJ-' + Date.now() + '-' + Math.random().toString(36).slice(2,8).toUpperCase();
     const body = { reference_id: orderId, customer: { name: nome, email }, items: [{ reference_id: 'mentoria-blackjack', name: 'Mentoria BLACKJACK', quantity: 1, unit_amount: 499 }], payment_methods: [{ type: 'PIX' }, { type: 'CREDIT_CARD' }], redirect_url: PUBLIC_URL + '/retorno.html?order=' + orderId, notification_urls: PUBLIC_URL ? [PUBLIC_URL + '/api/webhook'] : [], expiration_date: new Date(Date.now() + 1000*60*60*2).toISOString() };
-    const r = await fetch(BASE + '/checkouts', { method: 'POST', headers: { 'Authorization': 'Bearer ' + PAGBANK_TOKEN, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await r.json(); if(!r.ok) return res.status(r.status).json({ error: 'Erro PagBank', details: data });
+    const r = await pagbankRequest('/checkouts', 'POST', body);
+    const data = r.data; if(!r.ok) return res.status(r.status).json({ error: 'Erro PagBank', details: data });
     await saveOrder({ order_id: orderId, nome, email, status: 'PENDING', pagbank_id: data.id, created_at: new Date().toISOString() });
     const link = data.links?.find(l => l.rel === 'PAY')?.href || data.links?.[0]?.href;
     return res.json({ orderId, pay_url: link });
@@ -99,8 +154,8 @@ app.post('/api/verificar-acesso', async (req, res) => {
   }
   try{
     if(order.pagbank_id){
-      const r = await fetch(BASE + '/checkouts/' + order.pagbank_id, { headers: { 'Authorization': 'Bearer ' + PAGBANK_TOKEN } });
-      const d = await r.json();
+      const r = await pagbankRequest('/checkouts/' + order.pagbank_id, 'GET');
+      const d = r.data;
       if(d.status && d.status !== order.status){ order.status = d.status; await updateStatus(order.order_id, d.status); }
     }
   }catch{}
