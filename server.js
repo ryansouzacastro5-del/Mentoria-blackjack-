@@ -33,7 +33,6 @@ function resolvePagbankIp() {
     });
   });
 }
-
 function pagbankRequest(pathUrl, method = 'GET', bodyObj = null) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -67,6 +66,7 @@ function pagbankRequest(pathUrl, method = 'GET', bodyObj = null) {
     } catch (e) { reject(e); }
   });
 }
+
 // ===== FIM CORREÇÃO =====
 
 const DATA_DIR = path.join(__dirname, 'data');
